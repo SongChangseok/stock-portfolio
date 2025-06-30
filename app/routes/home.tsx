@@ -1,25 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 // @ts-ignore
 import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 
 const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY || 'YOUR_API_KEY';
-
-const initialPortfolio = [
-  {
-    name: 'Apple',
-    symbol: 'AAPL',
-    quantity: 10,
-    buyPrice: 170,
-    currentPrice: 0,
-  },
-  {
-    name: 'Microsoft',
-    symbol: 'MSFT',
-    quantity: 5,
-    buyPrice: 320,
-    currentPrice: 0,
-  },
-];
 
 const fetchCurrentPrice = async (symbol: string) => {
   const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
@@ -33,6 +16,18 @@ const fetchCurrentPrice = async (symbol: string) => {
   }
 };
 
+// Alpha Vantage SYMBOL_SEARCH API로 종목 검색
+const searchSymbol = async (keyword: string) => {
+  const url = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(keyword)}&apikey=${API_KEY}`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    return data.bestMatches || [];
+  } catch (e) {
+    return [];
+  }
+};
+
 const COLORS = [
   '#0088FE',
   '#00C49F',
@@ -42,8 +37,17 @@ const COLORS = [
   '#FF6699',
 ];
 
+// 포트폴리오 항목 타입 정의
+interface PortfolioItem {
+  name: string;
+  symbol: string;
+  quantity: number;
+  buyPrice: number;
+  currentPrice: number;
+}
+
 const Home = () => {
-  const [portfolio, setPortfolio] = useState(initialPortfolio);
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [editItem, setEditItem] = useState<any>(null);
@@ -52,14 +56,20 @@ const Home = () => {
     symbol: '',
     quantity: '',
     buyPrice: '',
+    currentPrice: '',
   });
+  // 검색 관련 상태
+  const [search, setSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFetchPrices = async () => {
     setLoading(true);
     const updated = await Promise.all(
       portfolio.map(async (item) => {
         const price = await fetchCurrentPrice(item.symbol);
-        return { ...item, currentPrice: price ?? 0 };
+        return { ...item, currentPrice: price ?? item.currentPrice };
       }),
     );
     setPortfolio(updated);
@@ -76,11 +86,14 @@ const Home = () => {
   // value가 모두 0이면 차트 표시 안함
   const hasPieData = pieData.some((d) => d.value > 0);
 
-  // label의 타입 명시 (any로 지정)
-  const renderLabel = (props: any) => {
-    const { name, percent } = props;
-    return `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`;
+  // 파이차트 라벨: 비율과 티커(symbol) 표시
+  const renderPieLabel = (props: any) => {
+    const { percent, name, symbol } = props;
+    return `${symbol ?? name}: ${(percent * 100).toFixed(0)}%`;
   };
+
+  // 파이차트 툴팁: USD 단위 표시
+  const renderPieTooltip = (value: number) => `${value.toLocaleString()} USD`;
 
   // 추가
   const handleAdd = (e: React.FormEvent) => {
@@ -99,10 +112,16 @@ const Home = () => {
         symbol: newItem.symbol.toUpperCase(),
         quantity: Number(newItem.quantity),
         buyPrice: Number(newItem.buyPrice),
-        currentPrice: 0,
+        currentPrice: newItem.currentPrice ? Number(newItem.currentPrice) : 0,
       },
     ]);
-    setNewItem({ name: '', symbol: '', quantity: '', buyPrice: '' });
+    setNewItem({
+      name: '',
+      symbol: '',
+      quantity: '',
+      buyPrice: '',
+      currentPrice: '',
+    });
   };
 
   // 삭제
@@ -144,9 +163,124 @@ const Home = () => {
     setEditItem(null);
   };
 
+  // 검색 입력 변경 및 자동 검색
+  const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearch(value);
+    if (value.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    const results = await searchSymbol(value);
+    setSearchResults(results);
+    setSearching(false);
+  };
+
+  // 검색 결과 클릭 시 입력폼에 자동 채우기
+  const handleSearchSelect = (item: any) => {
+    setNewItem({
+      name: item['2. name'] || '',
+      symbol: item['1. symbol'] || '',
+      quantity: '',
+      buyPrice: '',
+      currentPrice: '',
+    });
+    setSearch(item['2. name'] || '');
+    setSearchResults([]);
+  };
+
+  // JSON 다운로드
+  const handleDownload = () => {
+    const dataStr = JSON.stringify(portfolio, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'portfolio.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // JSON 업로드
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        if (Array.isArray(json)) {
+          setPortfolio(json);
+        } else {
+          alert('올바른 포트폴리오 JSON 파일이 아닙니다.');
+        }
+      } catch {
+        alert('JSON 파싱 오류');
+      }
+    };
+    reader.readAsText(file);
+    // 업로드 후 input 초기화
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   return (
     <div>
       <h2>나의 포트폴리오 (Alpha Vantage 실시간 주가)</h2>
+      {/* 업로드/다운로드 버튼 */}
+      <div style={{ marginBottom: 8 }}>
+        <button onClick={handleDownload} style={{ marginRight: 8 }}>
+          JSON 다운로드
+        </button>
+        <input
+          type="file"
+          accept="application/json"
+          ref={fileInputRef}
+          onChange={handleUpload}
+          style={{ display: 'inline-block' }}
+        />
+      </div>
+      {/* 종목 검색 */}
+      <div style={{ marginBottom: 8 }}>
+        <input
+          type="text"
+          placeholder="종목명/심볼 검색 (영문)"
+          value={search}
+          onChange={handleSearchChange}
+          style={{ width: 220, marginRight: 8 }}
+        />
+        {searching && <span style={{ fontSize: 12 }}>검색 중...</span>}
+        {searchResults.length > 0 && (
+          <div
+            style={{
+              background: '#fff',
+              border: '1px solid #ccc',
+              maxHeight: 180,
+              overflowY: 'auto',
+              position: 'absolute',
+              zIndex: 10,
+              width: 400,
+            }}
+          >
+            {searchResults.map((item, idx) => (
+              <div
+                key={item['1. symbol'] + idx}
+                style={{
+                  padding: 6,
+                  cursor: 'pointer',
+                  borderBottom: '1px solid #eee',
+                }}
+                onClick={() => handleSearchSelect(item)}
+              >
+                <b>{item['1. symbol']}</b> - {item['2. name']}{' '}
+                <span style={{ color: '#888', fontSize: 12 }}>
+                  ({item['4. region']})
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       {/* 추가 폼 */}
       <form
         onSubmit={handleAdd}
@@ -191,6 +325,16 @@ const Home = () => {
           onChange={(e) => setNewItem({ ...newItem, buyPrice: e.target.value })}
           style={{ width: 80 }}
         />
+        <input
+          type="number"
+          placeholder="현재가 (선택)"
+          name="currentPrice"
+          value={newItem.currentPrice}
+          onChange={(e) =>
+            setNewItem({ ...newItem, currentPrice: e.target.value })
+          }
+          style={{ width: 100 }}
+        />
         <button type="submit">추가</button>
       </form>
       <button
@@ -208,7 +352,7 @@ const Home = () => {
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={renderLabel}
+            label={renderPieLabel}
             outerRadius={100}
             fill="#8884d8"
             nameKey="symbol"
@@ -221,7 +365,7 @@ const Home = () => {
               />
             ))}
           </Pie>
-          <Tooltip />
+          <Tooltip formatter={renderPieTooltip} />
           <Legend />
         </PieChart>
       )}
@@ -280,9 +424,13 @@ const Home = () => {
                     />
                   </td>
                   <td>
-                    {item.currentPrice
-                      ? item.currentPrice.toLocaleString() + ' USD'
-                      : '-'}
+                    <input
+                      name="currentPrice"
+                      type="number"
+                      value={editItem.currentPrice}
+                      onChange={handleEditChange}
+                      style={{ width: 90 }}
+                    />
                   </td>
                   <td>
                     <button
