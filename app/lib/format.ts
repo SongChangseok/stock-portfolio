@@ -21,3 +21,11 @@ export function getReturnRate(buyPrice: number, currentPrice: number): number {
   if (buyPrice === 0) return 0;
   return toFixed2(((currentPrice - buyPrice) / buyPrice) * 100);
 }
+
+/**
+ * 전체 포트폴리오 평가금액 계산
+ */
+import type { Stock } from 'app/types/stock';
+export function getPortfolioTotal(stocks: Stock[]): number {
+  return stocks.reduce((sum, s) => sum + s.currentPrice * s.quantity, 0);
+}
