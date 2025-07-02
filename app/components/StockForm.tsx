@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import type { Stock } from 'app/types/stock';
+import type { Stock } from '../types/stock';
 
 export interface StockFormProps {
   initial?: Partial<Stock>;

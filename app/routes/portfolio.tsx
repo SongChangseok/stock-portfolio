@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { StockList } from 'app/components/StockList';
-import { StockForm } from 'app/components/StockForm';
-import { StockPieChart } from 'app/components/StockPieChart';
-import type { Stock } from 'app/types/stock';
+import { StockForm } from '../components/StockForm';
+import { StockPieChart } from '../components/StockPieChart';
+import type { Stock } from '../types/stock';
+import { StockList } from '../components/StockList';
 
 /**
  * 주식 포트폴리오 CRUD 및 시각화 메인 페이지

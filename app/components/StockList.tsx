@@ -1,6 +1,6 @@
 import React from 'react';
-import type { Stock } from 'app/types/stock';
-import { formatKRW, getReturnRate } from 'app/lib/format';
+import type { Stock } from '../types/stock';
+import { formatKRW, getReturnRate } from '../lib/format';
 
 export interface StockListProps {
   stocks: Stock[];

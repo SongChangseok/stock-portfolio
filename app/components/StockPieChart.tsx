@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import type { Stock } from 'app/types/stock';
-import { getPortfolioTotal, formatKRW } from 'app/lib/format';
+import type { Stock } from '../types/stock';
+import { getPortfolioTotal, formatKRW } from '../lib/format';
 
 export interface StockPieChartProps {
   stocks: Stock[];

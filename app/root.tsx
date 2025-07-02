@@ -6,7 +6,7 @@ import {
   ScrollRestoration,
 } from 'react-router';
 
-import type { Route } from './+types/root';
+// import type { Route } from './types/root'; // 실제 타입 정의가 필요하다면 상대경로 사용
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -29,7 +29,10 @@ export default function App() {
   return <Outlet />;
 }
 
-export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+// ErrorBoundary 타입은 실제로는 react-router에서 제공하는 RouteErrorBoundaryProps를 사용하는 것이 일반적입니다.
+import type { ErrorResponse } from 'react-router';
+
+export function ErrorBoundary({ error }: { error: unknown }) {
   let message = 'Oops!';
   let details = 'An unexpected error occurred.';
   let stack: string | undefined;
